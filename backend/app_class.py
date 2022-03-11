@@ -103,7 +103,7 @@ class AppClass():
         result = WebUtils.fileUpload(file, save_dir)
         return self.jsonifyResult(data=result)
 
-    def run(self, host="0.0.0.0", port=5000, debug=True):
+    def run(self, host="0.0.0.0", port=5001, debug=True):
         self.app.run(host=host, port=port, debug=debug)
         return self.app
 
