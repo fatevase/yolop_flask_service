@@ -4,18 +4,26 @@
     <meta charset="UTF-8">
     <title>Title</title>
 </head>
-<h1>上传文件</h1>
+<h1>Api Test</h1>
 <body>
 <form id="form1" method="post" action="/api/upload" enctype="multipart/form-data">
     <div>
         <input id="File1" type="file" name="myfile"/>  <!--后台代码中获取文件是通过form的name来标识的-->
-        <input type="submit">提交</input>
+        <input type="submit">测试内容</input>
     </div>
 </form>
+<br />
 <form id="form2" method="post" action="/form" enctype="multipartform-data">
     <div>
         <input id="test1" type="text" name="form_data"/>  <!--后台代码中获取文件是通过form的name来标识的-->
         <input type="submit">提交 to form</input>
+    </div>
+</form>
+<br/>
+<form id="form3" method="post" action="/api/detect" enctype="multipart/form-data">
+    <div>
+        <input id="File1" type="file" name="img"/>  <!--后台代码中获取文件是通过form的name来标识的-->
+        <input type="submit" value="检测">识别</input>
     </div>
 </form>
 </body>
