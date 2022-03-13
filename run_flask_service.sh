@@ -1,3 +1,3 @@
 #!/bin/bash
 # source activate && conda activate flask && 
-python ./backend/app.py
+python ./backend/app_class.py
