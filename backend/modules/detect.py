@@ -123,7 +123,6 @@ def detect_from_img(
     lane_in_real[ll_seg_mask != 0] = raw_image[ll_seg_mask != 0] * 0.5 + return_lane_img[ll_seg_mask != 0] * 0.5
     
     
-
     # 独立的可行驶车道图
     return_ego_img = empty_image.copy()
     return_ego_img[da_seg_mask == 1] = [0, 255, 0]
