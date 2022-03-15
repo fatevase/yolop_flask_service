@@ -155,7 +155,10 @@ def detect_from_img(
     # car_bbox_img : 车道线信息
     plt.imsave(save_dir+'/car_bbox.png', car_bbox_in_real)
 
+    # pic_str = base64.b64encode(buffer)
+
     result = {
+        'r_img': raw_image[...,::-1],
         'lane': return_lane_img,
         'ego': return_ego_img,
         'car_bbox': car_bbox_img,

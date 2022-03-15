@@ -1,10 +1,11 @@
 from crypt import methods
 from flask import Flask, jsonify, render_template, request, send_from_directory, make_response
 import os, io
+import json
 import time
 import base64
-import cv2
-
+import cv2, numpy
+import re
 
 from modules.detect import detect_from_img
 
@@ -58,24 +59,42 @@ class WebUtils:
     @staticmethod
     def tryRoadDetect(img, img_type='base64',
             need_lane=False, need_road=False, need_car=False):
+        if img_type == 'base64':
+            img = img.split(';base64,')[-1]
+
         data = detect_from_img(img, img_type=img_type,
         weight_file='modules/YOLOP/weights/End-to-end.pth')
         result = dict()
         # lane = WebUtils.compress_image(data['lane'])
         # ego = WebUtils.compress_image(data['ego'])
         # car_bbox = WebUtils.compress_image(data['car_bbox'])
+        output = numpy.zeros_like(data['r_img'])
         if need_lane:
             lane = data['lane']
+            output = output + lane
+        
+            retval, lane = cv2.imencode('.png', lane)
             result['lane'] = base64.b64encode(lane).decode('utf-8')
         if need_road:
             ego = data['ego']
+
+            output = output + ego
+            retval, ego = cv2.imencode('.png', ego)
             result['road'] = base64.b64encode(ego).decode('utf-8')
         if need_car:
             car_bbox = data['car_bbox']
             bbox = data['bbox_det']
+
+            output = output + car_bbox
+
+            car_bbox = WebUtils.compress_image(car_bbox)
+            
+            retval, car_bbox = cv2.imencode('.png', car_bbox)
             result['car_bbox'] = base64.b64encode(car_bbox).decode('utf-8')
             result['bbox'] = bbox
 
+        retval, output = cv2.imencode('.png', output)
+        result['output'] = base64.b64encode(output).decode('utf-8')
         return result
 
 
@@ -141,11 +160,33 @@ class AppClass():
         return self.jsonifyResult(data=request.values)
 
     def roadDetector(self, code=0, data=[]):
-        request_file = request.files
-        raw_img = request_file['img']
-        img_b64 = base64.b64encode(raw_img.read())
-        data = WebUtils.tryRoadDetect(img_b64, need_car=True)
-        return jsonify({"code":code, "data":data})
+        try:
+            data_type = request.values.get('data_type')
+            if data_type == 'file':
+                request_file = request.files
+                raw_img = request_file['img']
+                img_b64 = base64.b64encode(raw_img.read())
+            elif data_type == 'base64':
+                img_b64 = request.values.get('img')
+
+            detect_list = request.values.get('detect_list')
+            detect_list = json.loads(detect_list)
+
+            detect_args = dict()
+            if detect_list['lane_detection']:
+                detect_args['need_lane'] = True
+            if detect_list['ego_detection']:
+                detect_args['need_road'] = True
+            if detect_list['congestion_detection']:
+                detect_args['need_car'] = True
+            
+            print(detect_args)
+            data = WebUtils.tryRoadDetect(img_b64, **detect_args)
+            return jsonify({"code":code, "data":data})
+        except Exception as e:
+            return jsonify({"code":-1, "data":e})
+        
+
 
     def downloader(self, data):
         dirpath = os.path.join(self.app.root_path, self.UPLOAD_FOLDER)  # 这里是下在目录，从工程的根目录写起，比如你要下载static/js里面的js文件，这里就要写“static/js”
