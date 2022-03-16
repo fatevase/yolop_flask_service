@@ -8,6 +8,7 @@ import cv2, numpy
 import re
 
 from modules.detect import detect_from_img
+from test_socket import testSocket
 
 class WebUtils:
     def __init__(self):
@@ -56,6 +57,19 @@ class WebUtils:
         print(img.shape)
         return img
 
+    @staticmethod
+    def get_cam_num(max_cam_num=10):
+        cnt = 0
+        for device in range(0, max_cam_num):
+            stream = cv2.VideoCapture(device)
+
+            grabbed = stream.grab()
+            stream.release()
+            if not grabbed:
+                break
+            cnt = cnt + 1
+        return cnt
+    
     @staticmethod
     def tryRoadDetect(img, img_type='base64',
             need_lane=False, need_road=False, need_car=False):
@@ -149,6 +163,9 @@ class AppClass():
             # print(request.files)
             return self.roadDetector()
 
+        @app.route('/api/car_info', methods=['GET', 'POST'])
+        def car_info():
+            return self.getCarInfo()
 
     def jsonifyResult(self, code=0, data=[]):
         return jsonify({"code":code, "data":data})  
@@ -186,6 +203,15 @@ class AppClass():
         except Exception as e:
             return jsonify({"code":-1, "data":e})
         
+    def getCarInfo(self):
+        data = dict()
+        data['speed'] = 120
+        data['device'] = WebUtils.get_cam_num()
+        socket_data = testSocket('127.0.0.1:5001')
+        data['dems'] = -1
+        if socket_data['code'] > 0:
+            data['dems'] = socket_data['dems']
+        return jsonify({"code":1, "data":data})
 
 
     def downloader(self, data):
