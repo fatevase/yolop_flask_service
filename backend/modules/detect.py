@@ -157,12 +157,19 @@ def detect_from_img(
 
     # pic_str = base64.b64encode(buffer)
 
+    # result = {
+    #     'r_img': raw_image[...,::-1],
+    #     'lane': return_lane_img,
+    #     'ego': return_ego_img,
+    #     'car_bbox': car_bbox_img,
+    #     'bbox_det': det.tolist()
+    # }
     result = {
-        'r_img': raw_image[...,::-1],
-        'lane': return_lane_img,
-        'ego': return_ego_img,
-        'car_bbox': car_bbox_img,
-        'bbox_det': det.tolist()
+        'raw_img': raw_image[...,::-1],
+        'lane': ll_seg_mask,
+        'ego': da_seg_mask,
+        'car_bbox': car_bbox_mask,
+        'bbox_list': det.tolist(),
     }
     return result
 
