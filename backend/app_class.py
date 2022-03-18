@@ -6,6 +6,7 @@ import time
 import base64
 import cv2, numpy
 import re
+import random
 
 from modules.detect import detect_from_img
 from test_socket import testSocket
@@ -104,13 +105,18 @@ class AppClass():
         
     def getCarInfo(self):
         data = dict()
-        data['speed'] = 120
-        data['device'] = WebUtils.get_cam_num()
+        data['gas_num'] = 80 + (random.randint(0,30)-10)
+        data['car_speed'] = 60 + (random.randint(0,40)-20)
+        data['sensor_num'] = WebUtils.get_cam_num()
+        data['main_camera'] = f"camera-{0}"
+        data['car_temperature'] = 30 + (random.randint(0,100)-50) / 10.0
+        data['car_humidity'] = 50 + (random.randint(0,20)-10)
+        data['car_pollute'] = random.randint(0, 10) / 100.0
         socket_data = testSocket('127.0.0.1:5001')
-        data['dems'] = -1
+        data['net_delay'] = -1
         if socket_data['code'] > 0:
-            data['dems'] = socket_data['dems']
-        return jsonify({"code":1, "data":data})
+            data['net_delay'] = socket_data['dems']
+        return jsonify({"code":socket_data['code'], "data":data})
 
 
     def downloader(self, data):
