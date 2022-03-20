@@ -13,29 +13,15 @@
 
 注意：这个处理方式只是防止处理（解码、计算或播放）速度跟不上输入速度
 而导致程序崩溃或者后续视频画面花屏，在读取时还是丢弃一些视频帧
-
-这个在高性能机器上也没啥必要 [/doge]
 """
-import gc
-import os
 import time
-
-import cupy
-import numpy as np
-from matplotlib import pyplot
-from tensorflow.python.keras.backend import set_session
-
-from apps.models.model import detect_save, get_variable_from_model
-
-from apps import STATIC_DIR, app
-
 import threading
 import cv2
 
 
 class Observer:
 
-    def update(self,ok,frame):
+    def update(self, ok, frame):
         return
 
     def display(self):
@@ -78,8 +64,8 @@ class RTSCapture(cv2.VideoCapture,Subject,object):
         if isinstance(url, str) and url.startswith(tuple(rtscap.schemes)):
             rtscap._reading = True
         elif isinstance(url, int):
-            # 这里可能是本机设备
-            pass
+            # 本机摄像头
+            rtscap._reading = True
 
         return rtscap
 
@@ -143,107 +129,56 @@ class RTSCapture(cv2.VideoCapture,Subject,object):
         self._reading = False
         if self.frame_receiver.is_alive(): self.frame_receiver.join()
 
+class CameraStream(Observer, object):
+    ok = False
+    frame = None
+    last_access = 0
 
-# class Flow_Response (Observer,object):
+    @staticmethod
+    def create(capture_observer):
+        # rtscap = RTSCapture.create("rtsp://example.com/live/1")
+        # rtscap.registerObserver(CameraStream)
+        rtscap = CameraStream()
+        capture_observer.registerObserver(rtscap)
+        return rtscap
+    
+    def update(self, ok, frame):
+        self.ok = ok
+        self.frame = frame
 
-
-
-#     ok = False
-#     frame = None
-#     last_access = 0
-
-#     @staticmethod
-#     def create(weatherData):
-#         """实例化&初始化
-#         rtscap = RTSCapture.create("rtsp://example.com/live/1")
-#         or
-#         rtscap = RTSCapture.create("http://example.com/live/1.m3u8", "http://")
-#         """
-
-#         rtscap = Flow_Response()
-#         weatherData.registerObserver(rtscap)
-
-#         return rtscap
-
-#     def update(self,ok,frame):
-
-#         self.ok = ok
-#         self.frame = frame
-
-#         return
-#     def display(self):
-
-#         print(self.ok,self.frame)
-
-#         return
-
-#     def get_frame(self):
-
-#         return self.frame
-
-#     def get_bytes(self):
-#         # print(self.ok,self.frame)
-#         self.last_access = time.time()
-#         ret, jpeg = cv2.imencode('.jpg', self.frame)
-
-#         return jpeg.tobytes()
-
-#     def detect(self,detect_relative,response_name):
-#         self.last_access = time.time()
-#         filename = os.path.join(STATIC_DIR, detect_relative, response_name)
-#         graph = get_variable_from_model('graph')
-#         sess = get_variable_from_model('sess')
-#         model = get_variable_from_model('model')
-#         with graph.as_default():
-#             set_session(sess)
-#             detect_save(self.frame, model, filename)
-#         result_frame = pyplot.imread(filename)
-#         ret, result_jpeg = cv2.imencode('.jpg', result_frame)
-
-#         return result_jpeg.tobytes()
-
-
-# video_subject = RTSCapture.create(app.config['video'],"http://")
-# video_subject.start_read()
-
-# # while True:
-# #     url_observer.video()
-# def feed_gen():
-#     global video_subject
-#     url_observer = Flow_Response.create(video_subject)
-#     while True:
-
-#         # 帧处理代码写这里
-#         frame = url_observer.get_frame()
-#         # url_observer.display()
-#         try:
-#             if frame == None:
-#                 continue
-#         except:
-#             bytes = url_observer.get_bytes()
-
-#             # 使用generator函数输出视频流， 每次请求输出的content类型是image/jpeg
-#             yield (b'--frame\r\n'
-#                    b'Content-Type: image/jpeg\r\n\r\n' + bytes + b'\r\n\r\n')
+    def display(self):
+        print(self.ok, self.frame)
+        if self.ok:
+            cv2.imshow("CameraStream", self.frame)
+            cv2.waitKey(1)
+        
+    def get_frame(self):
+        self.last_access = time.time()
+        return self.frame
+    
+    def get_bytes(self):
+        self.last_access = time.time()
+        ret, jpg = cv2.imencode('.jpg', self.frame)
+        return jpg.tobytes()
+    
+    def detect():
+        pass
 
 
 
-# def out_gen(detect_relative,response_name):
-#     global video_subject
-#     url_observer = Flow_Response.create(video_subject)
-#     while True:
+if __name__ == "__main__":
+    # video_subject = RTSCapture.create('http://vfx.mtime.cn/Video/2019/02/04/mp4/190204084208765161.mp4', 'http://')
+    video_subject = RTSCapture.create(0)
+    # video_subject = RTSCapture.create(app.config['video'],"http://")
+    video_subject.start_read()
+    url_observer = CameraStream().create(video_subject)
 
-#         # 帧处理代码写这里
-#         frame = url_observer.get_frame()
-#         # url_observer.display()
-#         try:
-#             if frame == None:
-#                 continue
-#         except:
-#             bytes = url_observer.detect(detect_relative,response_name)
-
-#             # 使用generator函数输出视频流， 每次请求输出的content类型是image/jpeg
-#             yield (b'--frame\r\n'
-#                    b'Content-Type: image/jpeg\r\n\r\n' + bytes + b'\r\n\r\n')
-
-
+    while True:
+        frame = url_observer.get_frame()
+        url_observer.display()
+        try:
+            if frame == None:
+                continue
+        except:
+            url_observer.display()
+            # video_subject.stop_read()
