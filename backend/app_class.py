@@ -1,5 +1,5 @@
 from crypt import methods
-from flask import Flask, jsonify, render_template, request, send_from_directory, make_response
+from flask import Flask, jsonify, render_template, request, send_from_directory, make_response, Response
 import os, io
 import json
 import time
@@ -11,6 +11,7 @@ import random
 from modules.detect import detect_from_img
 from test_socket import testSocket
 from web_utils import WebUtils
+from video_stream import RTSCapture, StreamObserver
 
 class AppClass():
     '''
@@ -58,50 +59,114 @@ class AppClass():
 
         @app.route('/api/detect', methods=['GET', 'POST'])
         def road_detect():
-            # img 传入
-            # print('---'*10)
-            # print(request.files)
             return self.roadDetector()
 
         @app.route('/api/car_info', methods=['GET', 'POST'])
         def car_info():
             return self.getCarInfo()
+        
+        @app.route('/detect_stream', methods=['GET','POST'])
+        def stream_detect():
+        #only for json data
+            stream = self.streamDetect(self.basedir+'/inference/videos/1.mp4')
+            return self.streamResult(stream)
+
+        @app.route('/video_test', methods=['GET', 'POST'])
+        def video_test():
+            stream = WebUtils.test_gen(self.basedir+'/inference/videos/1.mp4')
+            return self.streamResult(stream)
 
     def jsonifyResult(self, code=0, data=[]):
-        return jsonify({"code":code, "data":data})  
+        return jsonify({"code":code, "data":data})
+    
+    def streamResult(self, stream=[], mimetype='multipart/x-mixed-replace; boundary=frame'):
+        return Response(stream, mimetype=mimetype)
 
     def home(self):
         return render_template('index.html')
     
     def form(self):
         return self.jsonifyResult(data=request.values)
+    
+    def streamDetect(self, source):
 
-    def roadDetector(self, code=0, data=[]):
+        # if hasattr(self, 'video_subject'):
+        #     if self.video_subject is None:
+        #         self.video_subject = RTSCapture.create(source)
+        # else:
+        #     self.video_subject = RTSCapture.create(source)
+        if not hasattr(self, 'video_subject'):
+            self.video_subject = RTSCapture.create(source)
+            self.video_subject.start_read()
+        url_observer = StreamObserver.create(self.video_subject)
+        print(url_observer, self.video_subject)
+        # if not hasattr(self, 'detect_args'):
+        #     self.detect_args = dict()
+        #     self.detect_args['img_type'] = 'stream'
+
+        print(self.detect_args)
+        print('whil true')
+
+        vid = cv2.VideoCapture(source)
+        while True:
+            return_value, frame = vid.read()
+            detect_args = self.detect_args
+            print(detect_args)
+            data = WebUtils.tryRoadDetect(frame, **detect_args)
+            output = data['output']
+            image = output.tobytes()
+            yield (b'--frame\r\n'
+                b'Content-Type: image/jpeg\r\n\r\n' + image + b'\r\n')
+
+        # while True:
+        #     frame = url_observer.get_frame()
+        #     # print(frame)
+        #     if frame is not None:
+        #         detect_args = self.detect_args
+        #         print(frame)
+        #         data = WebUtils.tryRoadDetect(frame, **detect_args)
+        #         output = data['output']
+        #         image = cv2.imencode('.jpg', output)[1].tobytes()
+        #         yield (b'--frame\r\n'
+        #             b'Content-Type: image/jpeg\r\n\r\n' + image + b'\r\n')
+
+    def roadDetector(self, code=1, data=[]):
+
+        detect_args = dict()
         try:
+            detect_list = request.values.get('detect_list')
+
+            if detect_list is not None:
+                detect_list = json.loads(detect_list)
+            
+                if detect_list['lane_detection']:
+                    detect_args['need_lane'] = True
+                if detect_list['ego_detection']:
+                    detect_args['need_road'] = True
+                if detect_list['congestion_detection']:
+                    detect_args['need_car'] = True
+
             data_type = request.values.get('data_type')
             if data_type == 'file':
                 request_file = request.files
-                raw_img = request_file['img']
-                img_b64 = base64.b64encode(raw_img.read())
+                raw_img = request_file['source']
+                source = base64.b64encode(raw_img.read())
             elif data_type == 'base64':
-                img_b64 = request.values.get('img')
+                source = request.values.get('source')
+            elif data_type == 'stream':
+                source = request.values.get('source')
+                self.detect_args = detect_args
+                self.detect_args['img_type'] = 'stream'
 
-            detect_list = request.values.get('detect_list')
-            detect_list = json.loads(detect_list)
-
-            detect_args = dict()
-            if detect_list['lane_detection']:
-                detect_args['need_lane'] = True
-            if detect_list['ego_detection']:
-                detect_args['need_road'] = True
-            if detect_list['congestion_detection']:
-                detect_args['need_car'] = True
+                data = dict(output="http://localhost:5001/detect_stream")
+                print(data)
+                return jsonify({'code':code, "data": data})
             
-            print(detect_args)
-            data = WebUtils.tryRoadDetect(img_b64, **detect_args)
+            data = WebUtils.tryRoadDetect(source, **detect_args)
             return jsonify({"code":code, "data":data})
         except Exception as e:
-            return jsonify({"code":-1, "data":e})
+            print(e)
+            return jsonify({"code":-1, "data":str(e)})
         
     def getCarInfo(self):
         data = dict()

@@ -66,6 +66,7 @@ class WebUtils:
             if not grabbed:
                 break
             cnt = cnt + 1
+            stream.release()
         return cnt
     
     @staticmethod
@@ -101,7 +102,32 @@ class WebUtils:
             outpuy = car_bbox
 
         print(f"--------{output.shape}")
-        retval, output = cv2.imencode('.png', output)
-        result['output'] = base64.b64encode(output).decode('utf-8')
+        _, output = cv2.imencode('.jpg', output)
+        if img_type == 'base64':
+            result['output'] = base64.b64encode(output).decode('utf-8')
+        else:
+            result['output'] = output
         return result
 
+    @staticmethod
+    def tryStreamDetect(url):
+        print('------')
+        print(url)
+        vid = cv2.VideoCapture(url)
+        while True:
+            return_value, frame = vid.read()
+            image = cv2.imencode('.jpg', frame)[1].tobytes()
+            yield (b'--frame\r\n'
+                b'Content-Type: image/jpeg\r\n\r\n' + image + b'\r\n')
+
+    @staticmethod
+    def test_gen(url):
+        video_path = url
+        print('------')
+        print(video_path)
+        vid = cv2.VideoCapture(video_path)
+        while True:
+            return_value, frame = vid.read()
+            image = cv2.imencode('.jpg', frame)[1].tobytes()
+            yield (b'--frame\r\n'
+                b'Content-Type: image/jpeg\r\n\r\n' + image + b'\r\n')

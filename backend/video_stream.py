@@ -1,16 +1,7 @@
-# !/usr/local/bin/python3
-# encodin: utf-8
-# author: cx
 """经过测试 cv2.VideoCapture 的 read 函数并不能获取实时流的最新帧
 而是按照内部缓冲区中顺序逐帧的读取，opencv会每过一段时间清空一次缓冲区
 但是清空的时机并不是我们能够控制的，因此如果对视频帧的处理速度如果跟不上接受速度
 那么每过一段时间，在播放时(imshow)时会看到画面突然花屏，甚至程序直接崩溃
-
-在网上查了很多资料，处理方式基本是一个思想
-使用一个临时缓存，可以是一个变量保存最新一帧，也可以是一个队列保存一些帧
-然后开启一个线程读取最新帧保存到缓存里，用户读取的时候只返回最新的一帧
-这里我是使用了一个变量保存最新帧
-
 注意：这个处理方式只是防止处理（解码、计算或播放）速度跟不上输入速度
 而导致程序崩溃或者后续视频画面花屏，在读取时还是丢弃一些视频帧
 """
@@ -20,24 +11,20 @@ import cv2
 
 
 class Observer:
-
     def update(self, ok, frame):
         return
-
     def display(self):
         return
 
 
 class Subject:
-
     def registerObserver(self, observer):
         return
-
     def removeObserver(self, observer):
         return
-
     def notifyObservers(self):
         return
+
 
 class RTSCapture(cv2.VideoCapture,Subject,object):
     """Real Time Streaming Capture.
@@ -62,6 +49,7 @@ class RTSCapture(cv2.VideoCapture,Subject,object):
         rtscap.schemes.extend(schemes)
 
         if isinstance(url, str) and url.startswith(tuple(rtscap.schemes)):
+            # 网络流
             rtscap._reading = True
         elif isinstance(url, int):
             # 本机摄像头
@@ -129,18 +117,17 @@ class RTSCapture(cv2.VideoCapture,Subject,object):
         self._reading = False
         if self.frame_receiver.is_alive(): self.frame_receiver.join()
 
-class CameraStream(Observer, object):
+
+class StreamObserver(Observer, object):
     ok = False
     frame = None
     last_access = 0
 
     @staticmethod
-    def create(capture_observer):
-        # rtscap = RTSCapture.create("rtsp://example.com/live/1")
-        # rtscap.registerObserver(CameraStream)
-        rtscap = CameraStream()
-        capture_observer.registerObserver(rtscap)
-        return rtscap
+    def create(stream_subject):
+        stream_observer = StreamObserver()
+        stream_subject.registerObserver(stream_observer)
+        return stream_observer
     
     def update(self, ok, frame):
         self.ok = ok
@@ -149,7 +136,7 @@ class CameraStream(Observer, object):
     def display(self):
         print(self.ok, self.frame)
         if self.ok:
-            cv2.imshow("CameraStream", self.frame)
+            cv2.imshow("StreamObserver", self.frame)
             cv2.waitKey(1)
         
     def get_frame(self):
@@ -158,7 +145,7 @@ class CameraStream(Observer, object):
     
     def get_bytes(self):
         self.last_access = time.time()
-        ret, jpg = cv2.imencode('.jpg', self.frame)
+        _, jpg = cv2.imencode('.jpg', self.frame)
         return jpg.tobytes()
     
     def detect():
@@ -169,16 +156,19 @@ class CameraStream(Observer, object):
 if __name__ == "__main__":
     # video_subject = RTSCapture.create('http://vfx.mtime.cn/Video/2019/02/04/mp4/190204084208765161.mp4', 'http://')
     video_subject = RTSCapture.create(0)
-    # video_subject = RTSCapture.create(app.config['video'],"http://")
     video_subject.start_read()
-    url_observer = CameraStream().create(video_subject)
+    url_observer = StreamObserver.create(video_subject)
+
 
     while True:
+
         frame = url_observer.get_frame()
-        url_observer.display()
-        try:
-            if frame == None:
-                continue
-        except:
+        if frame is not None:
             url_observer.display()
+        
+        # try:
+        #     if frame == None:
+        #         continue
+        # except:
+        #     url_observer.display()
             # video_subject.stop_read()

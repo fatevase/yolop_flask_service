@@ -61,7 +61,7 @@ def detect_from_img(
     elif img_type == 'path':
         img0 = cv2.imread(img, cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION)
     else:
-        img = img.copy()
+        img0 = img.copy()
 
     # image reshape
     h0, w0 = img0.shape[:2]
@@ -148,22 +148,13 @@ def detect_from_img(
     car_bbox_mask = np.max(car_bbox_img, 2)
     car_bbox_in_real[car_bbox_mask != 0] = raw_image[car_bbox_mask != 0] * 0.5 + car_bbox_img[car_bbox_mask != 0] * 0.5
 
-    # ll_seg_mask 车道线分割结果 
-    plt.imsave(save_dir+'/ll_seg_mask.png', lane_in_real)
-    # da_seg_mask : 可行驶区域
-    plt.imsave(save_dir+'/da_seg_mask.png', ego_in_real)
-    # car_bbox_img : 车道线信息
-    plt.imsave(save_dir+'/car_bbox.png', car_bbox_in_real)
+    # # ll_seg_mask 车道线分割结果 
+    # plt.imsave(save_dir+'/ll_seg_mask.png', lane_in_real)
+    # # da_seg_mask : 可行驶区域
+    # plt.imsave(save_dir+'/da_seg_mask.png', ego_in_real)
+    # # car_bbox_img : 车道线信息
+    # plt.imsave(save_dir+'/car_bbox.png', car_bbox_in_real)
 
-    # pic_str = base64.b64encode(buffer)
-
-    # result = {
-    #     'r_img': raw_image[...,::-1],
-    #     'lane': return_lane_img,
-    #     'ego': return_ego_img,
-    #     'car_bbox': car_bbox_img,
-    #     'bbox_det': det.tolist()
-    # }
     result = {
         'raw_img': raw_image[...,::-1],
         'lane': ll_seg_mask,

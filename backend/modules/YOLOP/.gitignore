@@ -6,7 +6,5 @@ __pycache__/
 bdd/
 runs/
 inference/
-*.pth
-*.pt
 *.tar
 *.tar.gz

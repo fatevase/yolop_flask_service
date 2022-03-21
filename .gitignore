@@ -6,7 +6,5 @@ __pycache__/
 .vscode/
 bdd/
 runs/
-*.pth
-*.pt
 *.tar
 *.tar.gz
