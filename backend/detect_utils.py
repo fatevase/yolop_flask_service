@@ -5,6 +5,7 @@ def pngMaskJpg(jpg, png, color="green"):
         'red': [0, 0, 255],
         'green': [0, 255, 0],
         'yellow':[44,208,245],
+        'pink':[217,100,252],
     }
 
     empty_image = np.zeros_like(jpg)

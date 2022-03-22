@@ -130,7 +130,9 @@ class AppClass():
 
             if detect_list is not None:
                 detect_list = json.loads(detect_list)
-            
+
+                if detect_list['passby_detection']:
+                    detect_args['need_passby'] = True
                 if detect_list['lane_detection']:
                     detect_args['need_lane'] = True
                 if detect_list['ego_detection']:

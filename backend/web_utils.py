@@ -7,6 +7,7 @@ import numpy as np
 import time
 
 from modules.detect import detect_from_img
+from modules.passby_detect import passby_detect
 import  detect_utils
 
 class WebUtils:
@@ -72,7 +73,7 @@ class WebUtils:
     
     @staticmethod
     def tryRoadDetect(img, img_type='base64',
-            need_lane=False, need_road=False, need_car=False):
+            need_lane=False, need_road=False, need_car=False, need_passby=False):
         if img_type == 'base64':
             img = img.split(';base64,')[-1]
         st = time.time()
@@ -81,7 +82,7 @@ class WebUtils:
         result = dict()
         print(f"detect img time: {time.time() - st}")
 
-        output = data['raw_img']
+        output = data['raw_img'].copy()
 
         if need_road:
             ego = data['ego']
@@ -95,13 +96,16 @@ class WebUtils:
             lane = data['lane']
             output = detect_utils.pngMaskJpg(output, lane, color="blue")
 
-            # output = output + lane
-
         if need_car:
             car_bbox = data['car_bbox']
-            result['bbox_list'] = data['bbox_list']
+            result['car_bbox_list'] = data['bbox_list']
             output = detect_utils.pngMaskJpg(output, car_bbox, color="yellow")
-            outpuy = car_bbox
+        
+        if need_passby:
+            passby, passby_bbox_list = passby_detect(data['raw_img'])
+            result['passby_bbox_list'] = passby_bbox_list
+            output = detect_utils.pngMaskJpg(output, passby, color="pink")
+
 
         output = cv2.resize(output, (640, 480), interpolation = cv2.INTER_AREA)
         _, output = cv2.imencode('.jpg', output)
