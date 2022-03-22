@@ -4,6 +4,7 @@ import json
 import base64
 import cv2
 import numpy as np
+import time
 
 from modules.detect import detect_from_img
 import  detect_utils
@@ -74,12 +75,18 @@ class WebUtils:
             need_lane=False, need_road=False, need_car=False):
         if img_type == 'base64':
             img = img.split(';base64,')[-1]
-
+        st = time.time()
         data = detect_from_img(img, img_type=img_type,
         weight_file='modules/YOLOP/weights/End-to-end.pth')
         result = dict()
+        print(f"detect img time: {time.time() - st}")
 
         output = data['raw_img']
+
+        if need_road:
+            ego = data['ego']
+            output = detect_utils.pngMaskJpg(output, ego, color="green")
+        
         # dst = np.zeros(output.shape, dtype=np.float32)
         # output = cv2.normalize(output, None, alpha=0, beta=1,
         #                      norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
@@ -90,18 +97,13 @@ class WebUtils:
 
             # output = output + lane
 
-        if need_road:
-            ego = data['ego']
-            output = detect_utils.pngMaskJpg(output, ego, color="green")
-
         if need_car:
             car_bbox = data['car_bbox']
             result['bbox_list'] = data['bbox_list']
-            print(f"car_bbox shape: {car_bbox.shape}, output: {output.shape}")
             output = detect_utils.pngMaskJpg(output, car_bbox, color="yellow")
             outpuy = car_bbox
 
-        print(f"--------{output.shape}")
+        output = cv2.resize(output, (640, 480), interpolation = cv2.INTER_AREA)
         _, output = cv2.imencode('.jpg', output)
         if img_type == 'base64':
             result['output'] = base64.b64encode(output).decode('utf-8')

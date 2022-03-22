@@ -11,6 +11,7 @@ sys.path.append(BASE_DIR)
 print(sys.path)
 import cv2
 import torch
+import threading
 import torch.backends.cudnn as cudnn
 from numpy import random
 import scipy.special
@@ -36,6 +37,26 @@ transform=transforms.Compose([
             transforms.ToTensor(),
             normalize,
         ])
+model = None
+class SingletonNet(object):
+    _instance_lock = threading.Lock()
+
+    def __init__(self, device='cpu', weight_file=None, cfg=None):
+        model = get_net(cfg)
+        device = torch.device(device)
+        checkpoint = torch.load(weight_file, map_location=device)
+        model.load_state_dict(checkpoint['state_dict'])
+        model = model.to(device)
+        self.model = model
+
+    def __new__(cls, *args, **kwargs):
+        if not hasattr(cls, "_instance"):
+            with cls._instance_lock:
+                if not hasattr(cls, "_instance"):
+                    cls._instance = super().__new__(cls)
+
+        return cls._instance
+
 
 def detect_from_img(
     img,
@@ -47,11 +68,14 @@ def detect_from_img(
     if not os.path.exists(save_dir):
         save_dir = os.path.join(BASE_DIR,save_dir)
     # Initialize
+    # fixed init model init time speed (but it cant change if init) 0.20s -> 0s
+    global model
+    # print(model)
+    st = time.time()
     device = torch.device('cpu')
-    model = get_net(cfg)
-    checkpoint = torch.load(weight_file, map_location=device)
-    model.load_state_dict(checkpoint['state_dict'])
-    model = model.to(device)
+    if model is None:
+        model = SingletonNet(device="cpu", cfg=cfg, weight_file=weight_file).model
+
 
     # 读取img
     if img_type == 'base64':
@@ -62,10 +86,9 @@ def detect_from_img(
         img0 = cv2.imread(img, cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION)
     else:
         img0 = img.copy()
-
     # image reshape
     h0, w0 = img0.shape[:2]
-    img, ratio, pad = letterbox_for_img(img0, new_shape=640, auto=True)
+    img, ratio, pad = letterbox_for_img(img0, new_shape=320, auto=True)
     h, w = img.shape[:2]
     shapes = (h0, w0), ((h / h0, w / w0), pad)
     img = np.ascontiguousarray(img)
@@ -80,12 +103,14 @@ def detect_from_img(
 
     # _ = model(tensor_img) # run once
     model.eval()
-
     det_out, da_seg_out,ll_seg_out= model(tensor_img)
+    # detect model spend 0.25~s
+    # print(f"model waste time:{time.time()-st}")
+
+    st = time.time()
 
     inf_out, _ = det_out
     det_pred = non_max_suppression(inf_out, conf_thres=0.25, iou_thres=0.45, classes=None, agnostic=False)
-
     det=det_pred[0]
 
     _, _, height, width = tensor_img.shape
@@ -106,55 +131,67 @@ def detect_from_img(
     ll_seg_mask = ll_seg_mask.int().squeeze().cpu().numpy()
 
 
+    # img_det = show_seg_result(raw_image.copy(), (da_seg_mask, ll_seg_mask), _, _, is_demo=True)
 
-    img_det = show_seg_result(raw_image.copy(), (da_seg_mask, ll_seg_mask), _, _, is_demo=True)
-
-
-    plt.imsave(save_dir+'/img_det.jpg', img_det)
+    # plt.imsave(save_dir+'/img_det.jpg', img_det)
 
     empty_image = np.zeros_like(raw_image, np.uint8)
 
-    # 独立的车道线rgb图
-    return_lane_img = empty_image.copy()
-    return_lane_img[ll_seg_mask == 1] = [0, 0, 255]
+    # # 独立的车道线rgb图
+    # return_lane_img = empty_image.copy()
+    # return_lane_img[ll_seg_mask == 1] = [0, 0, 255]
     
-    # 将车道线的图叠加到原图上
-    lane_in_real = raw_image.copy()
-    lane_in_real[ll_seg_mask != 0] = raw_image[ll_seg_mask != 0] * 0.5 + return_lane_img[ll_seg_mask != 0] * 0.5
+    # # 将车道线的图叠加到原图上
+    # lane_in_real = raw_image.copy()
+    # lane_in_real[ll_seg_mask != 0] = raw_image[ll_seg_mask != 0] * 0.5 + return_lane_img[ll_seg_mask != 0] * 0.5
     
     
-    # 独立的可行驶车道图
-    return_ego_img = empty_image.copy()
-    return_ego_img[da_seg_mask == 1] = [0, 255, 0]
+    # # 独立的可行驶车道图
+    # return_ego_img = empty_image.copy()
+    # return_ego_img[da_seg_mask == 1] = [0, 255, 0]
 
-    # 将可行驶区域的道路信叠加到原图上
-    ego_in_real = raw_image.copy()
-    ego_in_real[da_seg_mask != 0] = raw_image[da_seg_mask != 0] * 0.5 + return_ego_img[da_seg_mask != 0] * 0.5
+    # # 将可行驶区域的道路信叠加到原图上
+    # ego_in_real = raw_image.copy()
+    # ego_in_real[da_seg_mask != 0] = raw_image[da_seg_mask != 0] * 0.5 + return_ego_img[da_seg_mask != 0] * 0.5
     
 
     # 独立车道线信息
-    car_bbox_img = empty_image.copy()
+    # car_bbox_img = empty_image.copy()
+    # if len(det):
+    #     names = model.module.names if hasattr(model, 'module') else model.names
+    #     # colors = [[random.randint(0, 255) for _ in range(3)] for _ in range(len(names))]
+    #     colors = [[255, 0, 0] for _ in range(len(names))]
+    #     det[:,:4] = scale_coords(tensor_img.shape[2:],det[:,:4],raw_image.shape).round()
+    #     print(det)
+    #     for *xyxy,conf,cls in reversed(det):
+    #         label_det_pred = f'{names[int(cls)]} {conf:.2f}'
+    #         plot_one_box(xyxy, car_bbox_img , label=label_det_pred, color=colors[int(cls)], line_thickness=2)
+    # print(car_bbox_img.shape)
+    # # 将车辆边框叠加到原图上
+    # car_bbox_in_real = raw_image.copy()
+    # car_bbox_mask = np.max(car_bbox_img, 2)
+    # car_bbox_in_real[car_bbox_mask != 0] = raw_image[car_bbox_mask != 0] * 0.5 + car_bbox_img[car_bbox_mask != 0] * 0.5
+
+    car_bbox_mask = np.zeros_like(ll_seg_mask)
     if len(det):
         names = model.module.names if hasattr(model, 'module') else model.names
         # colors = [[random.randint(0, 255) for _ in range(3)] for _ in range(len(names))]
-        colors = [[255, 0, 0] for _ in range(len(names))]
+        colors = [[1] for _ in range(len(names))]
         det[:,:4] = scale_coords(tensor_img.shape[2:],det[:,:4],raw_image.shape).round()
         for *xyxy,conf,cls in reversed(det):
-            label_det_pred = f'{names[int(cls)]} {conf:.2f}'
-            plot_one_box(xyxy, car_bbox_img , label=label_det_pred, color=colors[int(cls)], line_thickness=2)
-    # print(car_bbox_img.shape)
-    # 将车辆边框叠加到原图上
-    car_bbox_in_real = raw_image.copy()
-    car_bbox_mask = np.max(car_bbox_img, 2)
-    car_bbox_in_real[car_bbox_mask != 0] = raw_image[car_bbox_mask != 0] * 0.5 + car_bbox_img[car_bbox_mask != 0] * 0.5
+            c1, c2 = (int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3]))
+            cv2.rectangle(car_bbox_mask, c1, c2, 1, thickness=4, lineType=cv2.LINE_AA)
 
+    # fixed all result shape spend 0.2=> 0.01s
+    print(f"detect fixed shape waster:{time.time()-st}")
+    
     # # ll_seg_mask 车道线分割结果 
     # plt.imsave(save_dir+'/ll_seg_mask.png', lane_in_real)
     # # da_seg_mask : 可行驶区域
     # plt.imsave(save_dir+'/da_seg_mask.png', ego_in_real)
     # # car_bbox_img : 车道线信息
     # plt.imsave(save_dir+'/car_bbox.png', car_bbox_in_real)
-
+    
     result = {
         'raw_img': raw_image[...,::-1],
         'lane': ll_seg_mask,
@@ -217,7 +254,6 @@ def detect(cfg,opt):
         # Inference
         t1 = time_synchronized()
         det_out, da_seg_out,ll_seg_out= model(img)
-
 
         t2 = time_synchronized()
         # if i == 0:

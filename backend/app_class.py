@@ -90,11 +90,6 @@ class AppClass():
     
     def streamDetect(self, source):
 
-        # if hasattr(self, 'video_subject'):
-        #     if self.video_subject is None:
-        #         self.video_subject = RTSCapture.create(source)
-        # else:
-        #     self.video_subject = RTSCapture.create(source)
         if not hasattr(self, 'video_subject'):
             self.video_subject = RTSCapture.create(source)
             self.video_subject.start_read()
@@ -104,14 +99,11 @@ class AppClass():
         #     self.detect_args = dict()
         #     self.detect_args['img_type'] = 'stream'
 
-        print(self.detect_args)
-        print('whil true')
-
         vid = cv2.VideoCapture(source)
         while True:
             return_value, frame = vid.read()
             detect_args = self.detect_args
-            print(detect_args)
+
             data = WebUtils.tryRoadDetect(frame, **detect_args)
             output = data['output']
             image = output.tobytes()
@@ -161,7 +153,8 @@ class AppClass():
                 data = dict(output="http://localhost:5001/detect_stream")
                 print(data)
                 return jsonify({'code':code, "data": data})
-            
+            # waster most was detect in model,
+            # time 1.2s=>0.2s
             data = WebUtils.tryRoadDetect(source, **detect_args)
             return jsonify({"code":code, "data":data})
         except Exception as e:
